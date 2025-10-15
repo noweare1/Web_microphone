@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Microphone Audio </title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+</head>
+
+<body>
+  <h1>Audio Streaming App</h1>
+  <button id="listenButton">Start Listening</button>
+  <button id="stopButton">Stop Listening</button>
+  
+  <script>
+    //NOTE : Assign local = true if this project will be run on local network and false if run over the internet
+    const listenBtn = document.getElementById('listenButton');
+    const stopBtn = document.getElementById('stopButton');
+    let FREQUENCY = 8000;  
+    let local=true;  //selects correct statement for ws or wss:
+    let ws;
+    let stopListening = false;
+    let waitingResolve = false;
+    let playing = false;
+    let SAMPLES = 4096;
+    let audioContext;
+    let floatData = new Float32Array(SAMPLES);
+    let printData = false;
+    let displayMsgs = false;
+
+    // function toHex(typedArray) {
+    //   return Array.from(typedArray).map(byte => ('0' + (byte & 0xFF).toString(16)).slice(-2))
+    // }
+    window.addEventListener("load", (event) => {
+        console.log("page is fully loaded");
+     }); //addEventListener load
+
+
+    stopBtn.addEventListener('click', () => {
+          stopListening = true;
+          //send('stop'); //contact server to stop sending packets
+          console.log('sent stop cmd');
+    }); 
+
+
+    listenBtn.addEventListener('click', () => {
+      if (playing === false)
+        playBtnCallback();  //this would be the first set of audio data
+    });
+
+   
+    //Callback for play button
+    async function playBtnCallback() {
+      try {
+        playing = true;
+
+        if (displayMsgs)
+          console.log('in PBC', Date.now());
+      
+        await sendMessage('load')  
+       
+      } catch (error) {
+          console.error('Error requesting data:', error);
+      }
+    }
+
+    //if we need to wait for a response for a certain request this will do it
+    async function sendMessage(message) {
+      
+      if (displayMsgs) {
+        console.log('sending msg in sendMsg', Date.now());
+      }
+
+      waitingResolve = true;
+      await send(message); 
+    } 
+
+    // Send message without waiting for response
+    async function send(message) {
+      if (ws.readyState !== WebSocket.OPEN) {
+        throw new Error('WebSocket is not connected');
+      }
+
+      if (displayMsgs){
+        console.log('sending msg in send', Date.now());
+      }
+
+      await ws.send(message);
+      console.log('sent ', message);
+      //this.ws.send(JSON.stringify(message)); for json
+    }
+
+
+    function connect() {
+     return new Promise((resolve, reject) => {
+      console.log('url is ', window.location.host)
+      if (local === true) {
+        ws = new WebSocket('ws://' + window.location.host + '/ws');
+      }
+      else {
+        ws = new WebSocket('wss://' + window.location.host + '/ws');
+      }
+
+      ws.onopen = () => {
+        console.log(' WebSocket connected '); //using ${WebSocket.protocol}`);
+         ws.binaryType = 'arraybuffer'; //blob or arraybuffer types,
+         // console.log(window.location.host);
+       resolve();
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        reject(error);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket connection closed');
+      };
+        
+    ws.onmessage = (event) => {
+      //let data = JSON.parse(event.data);
+      let response = event.data;
+
+      if (displayMsgs)
+      console.log('got data in onMsg', Date.now());
+
+      try {
+        if (typeof response === 'string') {
+             console.log(response);
+        } //if string
+        else { 
+          if (event.data instanceof ArrayBuffer) {
+              if (waitingResolve) {   //this is only for 1st time thru
+                waitingResolve = false ;
+                conditionData(response);
+
+                if (displayMsgs)
+                  console.log('first PNB call in OnMsg', Date.now());
+
+                playNextBuffer();  //after this, playNextBuffer() calls itself
+              }
+              else 
+                conditionData(response);  //after first time thru
+              
+          } //if
+        }//else
+      } catch(error) {
+        console.log(`error is ${error}`);
+      }
+    }; //onmessage
+
+  });//promise
+  }//async connect
+
+
+  //changes raw audio to floats
+  function conditionData(Data) {
+  
+  if (displayMsgs)
+    console.log('in condtionData');
+
+    if (printData === true) {
+      let mydata = new Int8Array(Data);
+      console.log(toHex(mydata.slice(0, 16)));
+    }
+    // return messageQueue.shift();
+    //process the audio data
+    audioData = new Int16Array(Data); //create the view here
+   
+    for (let i = 0; i < audioData.length; i++) {
+      //Convert from int16 to float32 (normalize to [-1.0, 1.0])
+      floatData[i] = audioData[i] / 32768.0;
+    }
+  } //conditionData
+  
+
+    
+    //------------ PLAY CALLBACK-------------------//
+    function playNextBuffer() {
+      
+      if (displayMsgs)
+        console.log('in playnextbuffer');
+
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    
+      //createBuffer(numOfChannels, length, sampleRate)
+      const audioBuffer = audioContext.createBuffer(1, floatData.length, FREQUENCY);
+      audioBuffer.getChannelData(0).set(floatData);
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer; //fill source.buffer with float data
+     
+      //connect source to destination (how does destination know it is the speakers)
+      source.connect(audioContext.destination);
+      source.start(); 
+
+      if (displayMsgs)
+        console.log('load in PNB', Date.now());
+      
+      if (stopListening === true) {
+        send('stop'); 
+        stopListening = false;
+        playing = false;
+      }
+      else {
+       send('load');
+       source.onended = function () {
+             playNextBuffer();
+       }
+       }
+            
+    } //play next buffer
+         
+    
+    // Usage example
+    async function main() {
+      try {
+        await connect(); //this returns a promise resolve()
+        console.log('Successfully connected!');
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+main();
+
+
+  </script>
+</body>
+
+</html>

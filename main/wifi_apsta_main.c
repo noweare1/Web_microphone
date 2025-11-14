@@ -7,6 +7,8 @@
     Note: Remember to change variable local in audio.html to chose
     whether this app is going to be used locally or remotely before
     building.
+
+
 */
 
 #include <string.h>
@@ -177,10 +179,15 @@ void init_microphone(void)
         .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_MONO),
         .gpio_cfg = {
             .mclk = I2S_GPIO_UNUSED, // some codecs may require mclk signal, this example doesn't need it
+         /* .bclk = GPIO_NUM_1,//GPIO_NUM_14,
+            .ws = GPIO_NUM_2,//GPIO_NUM_12,
+            .dout = I2S_GPIO_UNUSED,
+            .din = GPIO_NUM_35,
+          */
             .bclk = GPIO_NUM_14,
             .ws = GPIO_NUM_12,
             .dout = I2S_GPIO_UNUSED,
-            .din = GPIO_NUM_33,
+            .din = GPIO_NUM_35,
             .invert_flags = {
                 .mclk_inv = false,
                 .bclk_inv = false,

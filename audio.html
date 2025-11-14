@@ -7,15 +7,25 @@
 
 <body>
   <h1>Audio Streaming App</h1>
+  <button id="connectButton">Connect</button>
   <button id="listenButton">Start Listening</button>
-  <button id="stopButton">Stop Listening</button>
+  <button id="stopButton">Stop Listening</button><br>
+  <label id="mylabel" for="loc">local Network</label>
+  <input type="checkbox" id="mycheckbox" name="local_checkbox">
   
   <script>
     //NOTE : Assign local = true if this project will be run on local network and false if run over the internet
     const listenBtn = document.getElementById('listenButton');
     const stopBtn = document.getElementById('stopButton');
+    const connectBtn = document.getElementById('connectButton');
+    const mycheckbox = document.getElementById('mycheckbox');
+    const mylabel= document.getElementById('mylabel');
+    
+    listenBtn.hidden = true;
+    stopBtn.hidden = true;
+    
     let FREQUENCY = 8000;  
-    let local=true;  //selects correct statement for ws or wss:
+  //  let local=true;  //selects correct statement for ws or wss:
     let ws;
     let stopListening = false;
     let waitingResolve = false;
@@ -46,7 +56,11 @@
         playBtnCallback();  //this would be the first set of audio data
     });
 
-   
+   connectBtn.addEventListener('click', () => {
+      if (playing === false)
+        connectBtnCallback();  //this would be the first set of audio data
+    });
+
     //Callback for play button
     async function playBtnCallback() {
       try {
@@ -89,15 +103,22 @@
     }
 
 
-    function connect() {
+     async function connectBtnCallback() {
      return new Promise((resolve, reject) => {
-      console.log('url is ', window.location.host)
-      if (local === true) {
+     console.log('url is ', window.location.host)
+     
+     if (mycheckbox.checked) {
         ws = new WebSocket('ws://' + window.location.host + '/ws');
       }
       else {
         ws = new WebSocket('wss://' + window.location.host + '/ws');
       }
+      
+      stopBtn.hidden = false;
+      listenBtn.hidden = false;
+      connectBtn.hidden = true;
+      mycheckbox.hidden = true;
+      mylabel.hidden = true;
 
       ws.onopen = () => {
         console.log(' WebSocket connected '); //using ${WebSocket.protocol}`);
@@ -221,7 +242,7 @@
       }
     }
 
-main();
+//main();
 
 
   </script>
